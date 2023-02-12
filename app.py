@@ -1,19 +1,15 @@
-import os
 from contextlib import nullcontext
 import gradio as gr
 import torch
 from torch import autocast
 from diffusers import StableDiffusionPipeline
-from ray.serve.gradio_integrations import GradioServer
 
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 context = autocast if device == "cuda" else nullcontext
 dtype = torch.float16 if device == "cuda" else torch.float32
 
-pipe = StableDiffusionPipeline.from_pretrained(
-    "lambdalabs/sd-naruto-diffusers", torch_dtype=dtype
-)
+pipe = StableDiffusionPipeline.from_pretrained("lambdalabs/sd-naruto-diffusers", torch_dtype=dtype)
 pipe = pipe.to(device)
 
 
@@ -28,13 +24,11 @@ pipe = pipe.to(device)
 
 
 def infer(prompt, n_samples, steps, scale):
+
     with context("cuda"):
-        images = pipe(
-            n_samples * [prompt], guidance_scale=scale, num_inference_steps=steps
-        ).images
+        images = pipe(n_samples*[prompt], guidance_scale=scale, num_inference_steps=steps).images
 
     return images
-
 
 css = """
         a {
@@ -121,17 +115,17 @@ block = gr.Blocks(css=css)
 
 examples = [
     [
-        "Yoda",
+        'Yoda',
         2,
         7.5,
     ],
     [
-        "Abraham Lincoln",
+        'Abraham Lincoln',
         2,
         7.5,
     ],
     [
-        "George Washington",
+        'George Washington',
         2,
         7,
     ],
@@ -151,10 +145,6 @@ with block:
               <p style="margin-bottom: 10px; font-size: 94%">
               Generate new Naruto anime character from a text description,
                 <a href="https://lambdalabs.com/blog/how-to-fine-tune-stable-diffusion-how-we-made-the-text-to-pokemon-model-at-lambda/">created by Lambda Labs</a>.
-              </p>
-              <p style="margin-bottom: 10px; font-size: 94%">
-              Running on Lambda Cloud
-                <a href="https://lambdalabs.com/service/gpu-cloud">A10 GPU Instances</a>.
               </p>
             </div>
         """
@@ -181,6 +171,7 @@ with block:
             label="Generated images", show_label=False, elem_id="gallery"
         ).style(grid=[2], height="auto")
 
+
         with gr.Row(elem_id="advanced-options"):
             samples = gr.Slider(label="Images", minimum=1, maximum=4, value=2, step=1)
             steps = gr.Slider(label="Steps", minimum=5, maximum=50, value=50, step=5)
@@ -188,14 +179,10 @@ with block:
                 label="Guidance Scale", minimum=0, maximum=50, value=7.5, step=0.1
             )
 
-        ex = gr.Examples(
-            examples=examples,
-            fn=infer,
-            inputs=[text, samples, scale],
-            outputs=gallery,
-            cache_examples=False,
-        )
+
+        ex = gr.Examples(examples=examples, fn=infer, inputs=[text, samples, scale], outputs=gallery, cache_examples=False)
         ex.dataset.headers = [""]
+
 
         text.submit(infer, inputs=[text, samples, steps, scale], outputs=gallery)
         btn.click(infer, inputs=[text, samples, steps, scale], outputs=gallery)
@@ -214,15 +201,4 @@ with block:
            """
         )
 
-# without rayserve
-# block.launch()
-
-# With rayserve
-num_replicas = (
-    os.getenv("DEMO_NUM_REPLICAS")
-    if "DEMO_NUM_REPLICAS" in os.environ
-    else torch.cuda.device_count()
-)
-app = GradioServer.options(
-    num_replicas=num_replicas, ray_actor_options={"num_gpus": 1.0, "num_cpus": 16.0}
-).bind(block)
+block.launch()
